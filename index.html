@@ -1050,24 +1050,40 @@ function confirmBooking() {
   booking.notes = document.getElementById('notes-input').value;
   const ref = 'ML-' + Math.random().toString(36).substring(2,8).toUpperCase();
   const dateStr = booking.date.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+
+  // Build payload BEFORE navigation
+  const payload = JSON.stringify({
+    action: 'booking',
+    service: booking.service,
+    stylist: booking.stylist,
+    date: booking.date.toISOString().split('T')[0],
+    time: booking.time,
+    price: booking.price,
+    duration: booking.duration,
+    notes: booking.notes,
+    ref
+  });
+
+  // Update success screen
   document.getElementById('success-detail').innerHTML =
     `${booking.service} with ${booking.stylist}<br>${dateStr} at ${booking.time}`;
   document.getElementById('booking-ref').textContent = `Ref: ${ref}`;
   goTo('screen-success');
 
-  // Send data to Telegram bot
-  if (tg) {
-    tg.sendData(JSON.stringify({
-      action: 'booking',
-      service: booking.service,
-      stylist: booking.stylist,
-      date: booking.date.toISOString().split('T')[0],
-      time: booking.time,
-      price: booking.price,
-      duration: booking.duration,
-      notes: booking.notes,
-      ref
-    }));
+  // CRITICAL: sendData() CLOSES the Mini App immediately.
+  // Delay it so the success screen renders first, then Telegram closes the app
+  // and fires web_app_data to the bot.
+  if (tg && typeof tg.sendData === 'function') {
+    setTimeout(() => {
+      try {
+        tg.sendData(payload);
+      } catch(e) {
+        console.error('sendData error:', e);
+      }
+    }, 900);
+  } else {
+    // Running in browser (not Telegram) — just log for testing
+    console.log('[DEBUG] Booking payload:', payload);
   }
 }
 </script>
