@@ -1,145 +1,925 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    <title>Shringar Studio</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        :root{ --gold: #D4A017; --saffron: #FF6B00; --bg: #0F0500; --cream: #FFF8F0; }
-        body{ background: var(--bg); font-family: 'Poppins', sans-serif; color: var(--cream); margin:0; }
-        .screen{ display:none; padding: 20px; padding-bottom: 100px; animation: fadeIn 0.3s; }
-        .active{ display:block; }
-        @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
-        .card{ background: rgba(255,255,255,0.05); border: 1px solid rgba(212,160,23,0.2); border-radius:12px; padding:15px; margin-bottom:10px; cursor:pointer; }
-        .selected{ border-color: var(--gold); background: rgba(212,160,23,0.1); }
-        .grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-        .slot-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
-        .slot{ padding:10px; text-align:center; border:1px solid #333; border-radius:8px; font-size:12px; }
-        .slot.booked{ opacity:0.2; pointer-events:none; }
-        .slot.picked{ background: var(--gold); color: black; border-color: var(--gold); }
-        .btn-primary{ position:fixed; bottom:20px; left:20px; right:20px; padding:15px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--gold), var(--saffron)); color:black; font-weight:700; cursor:pointer; }
-        .btn-primary:disabled{ opacity:0.3; }
-        input{ width:100%; padding:12px; margin-bottom:15px; background:#1a1a1a; border:1px solid #333; color:white; border-radius:8px; box-sizing:border-box; }
-    </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Shringar — Book Appointment</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<style>
+:root{
+  --saffron:#FF6B00;--saffron-lt:#FF8C3A;--saffron-glow:#FF6B0033;
+  --gold:#D4A017;--gold-lt:#F0C040;--gold-glow:#D4A01730;
+  --maroon:#8B1A1A;--rose:#C0395A;--rose-lt:#E05A7A;
+  --cream:#FFF8F0;--cream-dk:#F5EBD8;
+  --ink:#0F0500;--text:#2C1400;--text-mid:#6B3A1F;--text-light:#A0714A;
+  --glass:rgba(255,255,255,0.06);--border:rgba(212,160,23,0.25);--border-lt:rgba(212,160,23,0.12);
+  --bg:#0F0500;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);font-family:'Poppins',sans-serif;color:var(--cream);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;top:-20%;right:-20%;width:70vw;height:70vw;background:radial-gradient(circle,rgba(212,160,23,0.07) 0%,transparent 70%);border-radius:50%;pointer-events:none;z-index:0;}
+#app{position:relative;z-index:1;max-width:430px;margin:0 auto;min-height:100vh;}
+.screen{display:none;animation:fadeUp .3s ease;padding-bottom:90px;}
+.screen.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* Loading */
+.loading-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+.loading-spinner{width:40px;height:40px;border:3px solid rgba(212,160,23,0.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:13px;color:var(--text-light);}
+
+/* Top ornament */
+.top-ornament{display:flex;align-items:center;justify-content:center;padding:14px 20px 8px;gap:10px;opacity:.5;}
+.ornament-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold));}
+.ornament-line.r{background:linear-gradient(90deg,var(--gold),transparent);}
+.ornament-diamond{color:var(--gold);font-size:10px;}
+
+/* Header */
+.header{text-align:center;padding:8px 24px 16px;}
+.salon-hindi{font-family:'Noto Sans Devanagari',sans-serif;font-size:11px;color:var(--gold);letter-spacing:3px;opacity:.8;margin-bottom:3px;}
+.salon-name{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;background:linear-gradient(135deg,var(--gold-lt),var(--saffron),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.salon-tagline{font-size:11px;color:var(--text-light);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;}
+
+/* Steps */
+.steps{display:flex;align-items:center;justify-content:center;padding:0 32px 14px;gap:0;}
+.step-dot{width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(212,160,23,0.25);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-light);background:rgba(212,160,23,0.04);font-weight:600;flex-shrink:0;transition:all .3s;}
+.step-dot.active{border-color:var(--gold);background:var(--gold-glow);color:var(--gold-lt);box-shadow:0 0 12px var(--gold-glow);}
+.step-dot.done{border-color:var(--saffron);background:var(--saffron-glow);color:var(--saffron);}
+.step-line{flex:1;height:1px;background:rgba(212,160,23,0.18);}
+
+/* Section */
+.section-wrap{padding:0 16px 12px;}
+.section-label{font-family:'Playfair Display',serif;font-size:19px;font-weight:600;color:var(--cream);margin-bottom:2px;}
+.section-sub{font-size:11px;color:var(--text-light);}
+.back-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px 0;font-size:12px;color:var(--text-light);cursor:pointer;margin-bottom:2px;}
+.back-btn:hover{color:var(--gold);}
+
+/* Services */
+.services-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 12px;}
+.service-card{background:linear-gradient(145deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));border:1px solid var(--border-lt);border-radius:14px;padding:14px 12px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+.service-card.selected{border-color:var(--gold);background:linear-gradient(145deg,rgba(212,160,23,0.14),rgba(212,160,23,0.04));box-shadow:0 4px 18px rgba(212,160,23,0.18);}
+.service-card.selected::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.svc-icon{font-size:26px;display:block;margin-bottom:7px;}
+.svc-name{font-size:12px;font-weight:600;color:var(--cream);margin-bottom:3px;line-height:1.3;}
+.svc-tags{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px;}
+.svc-tag{font-size:9px;padding:1px 5px;border-radius:20px;background:rgba(212,160,23,0.1);color:var(--gold);border:1px solid rgba(212,160,23,0.2);}
+.svc-price{font-family:'Playfair Display',serif;font-size:15px;color:var(--gold-lt);font-weight:700;}
+.svc-check{position:absolute;top:7px;right:7px;width:18px;height:18px;border-radius:50%;background:var(--gold);color:var(--ink);font-size:10px;display:none;align-items:center;justify-content:center;font-weight:700;}
+.service-card.selected .svc-check{display:flex;}
+
+/* Selection bar */
+.sel-bar{margin:10px 12px;background:linear-gradient(135deg,rgba(212,160,23,0.15),rgba(255,107,0,0.08));border:1px solid rgba(212,160,23,0.35);border-radius:12px;padding:10px 14px;display:none;align-items:center;justify-content:space-between;gap:10px;}
+.sel-bar.visible{display:flex;}
+.sel-bar-left{flex:1;min-width:0;}
+.sel-bar-name{font-size:11px;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px;}
+.sel-bar-meta{display:flex;gap:10px;}
+.sel-bar-total{font-family:'Playfair Display',serif;font-size:15px;color:var(--gold-lt);font-weight:700;}
+.sel-bar-dur{font-size:10px;color:var(--text-light);}
+.sel-bar-clear{font-size:11px;color:var(--text-light);cursor:pointer;padding:4px 8px;border:1px solid rgba(255,255,255,0.1);border-radius:20px;flex-shrink:0;}
+
+/* Staff */
+.staff-list{padding:0 12px;display:flex;flex-direction:column;gap:9px;}
+.staff-card{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));border:1px solid var(--border-lt);border-radius:14px;padding:13px 14px;cursor:pointer;transition:all .2s;}
+.staff-card.selected{border-color:var(--gold);background:linear-gradient(135deg,rgba(212,160,23,0.12),rgba(212,160,23,0.04));box-shadow:0 3px 16px rgba(212,160,23,0.12);}
+.staff-avatar{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:white;flex-shrink:0;border:1.5px solid rgba(212,160,23,0.3);}
+.staff-info{flex:1;min-width:0;}
+.staff-name{font-size:13px;font-weight:600;color:var(--cream);margin-bottom:2px;}
+.staff-role{font-size:11px;color:var(--text-light);margin-bottom:4px;}
+.staff-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.staff-stars{color:var(--gold);font-size:11px;}
+.staff-badge{font-size:9px;padding:2px 6px;border-radius:20px;font-weight:600;}
+.badge-top{background:rgba(212,160,23,0.12);color:var(--gold);border:1px solid rgba(212,160,23,0.25);}
+.staff-spec{font-size:10px;color:var(--text-light);font-style:italic;margin-top:2px;}
+.staff-check{width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(212,160,23,0.25);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:10px;flex-shrink:0;transition:all .2s;}
+.staff-card.selected .staff-check{background:var(--gold);color:var(--ink);border-color:var(--gold);}
+
+/* Calendar */
+.cal-wrap{padding:0 12px;}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cal-month{font-family:'Playfair Display',serif;font-size:15px;color:var(--cream);}
+.cal-nav{background:rgba(212,160,23,0.1);border:1px solid rgba(212,160,23,0.2);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gold);font-size:14px;transition:all .2s;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-day-name{text-align:center;font-size:9px;color:var(--text-light);padding:4px 0;font-weight:500;letter-spacing:.5px;}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:9px;font-size:12px;cursor:pointer;transition:all .2s;color:var(--cream);border:1px solid transparent;}
+.cal-day:hover:not(.disabled):not(.empty){background:rgba(212,160,23,0.1);border-color:rgba(212,160,23,0.2);}
+.cal-day.selected{background:var(--gold);color:var(--ink);font-weight:700;border-color:var(--gold);box-shadow:0 3px 10px rgba(212,160,23,0.35);}
+.cal-day.today{border-color:rgba(255,107,0,0.4);color:var(--saffron-lt);}
+.cal-day.disabled{color:rgba(255,255,255,0.18);cursor:default;}
+.cal-day.empty{cursor:default;}
+
+/* Slots */
+.slots-section{padding:14px 12px 0;}
+.slots-title{font-size:12px;font-weight:600;color:var(--cream);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+.slots-title::after{content:'';flex:1;height:1px;background:var(--border-lt);}
+.slots-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
+.slot{padding:8px 4px;text-align:center;border:1px solid var(--border-lt);border-radius:9px;font-size:11px;cursor:pointer;color:var(--cream);transition:all .2s;background:rgba(255,255,255,0.02);font-weight:500;}
+.slot:hover:not(.booked){border-color:rgba(212,160,23,0.4);background:rgba(212,160,23,0.08);}
+.slot.selected{background:var(--gold);color:var(--ink);border-color:var(--gold);font-weight:700;}
+.slot.booked{opacity:.35;cursor:not-allowed;position:relative;}
+.slot.booked::after{content:'•';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--saffron);}
+.slots-empty{text-align:center;padding:20px;color:var(--text-light);font-size:12px;}
+
+/* Form */
+.form-wrap{padding:0 12px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:11px;color:var(--text-light);margin-bottom:5px;letter-spacing:.3px;display:block;}
+.form-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border-lt);border-radius:10px;padding:11px 13px;color:var(--cream);font-size:13px;font-family:'Poppins';outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--gold);}
+.form-input::placeholder{color:rgba(160,113,74,0.6);}
+.phone-wrap{display:flex;gap:8px;}
+.phone-prefix{background:rgba(212,160,23,0.1);border:1px solid var(--border-lt);border-radius:10px;padding:11px 13px;color:var(--gold);font-size:13px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+.form-note{font-size:10px;color:var(--text-light);margin-top:4px;font-style:italic;}
+
+/* Confirm card */
+.confirm-card{margin:0 12px;background:linear-gradient(145deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));border:1px solid var(--border);border-radius:18px;overflow:hidden;}
+.confirm-head{background:linear-gradient(135deg,rgba(212,160,23,0.18),rgba(255,107,0,0.08));padding:14px 18px;border-bottom:1px solid var(--border-lt);text-align:center;}
+.confirm-salon{font-family:'Playfair Display',serif;font-size:15px;color:var(--gold-lt);}
+.confirm-sub{font-size:10px;color:var(--text-light);margin-top:2px;}
+.confirm-rows{padding:4px 0;}
+.confirm-row{display:flex;align-items:center;padding:10px 18px;gap:12px;border-bottom:1px solid var(--border-lt);}
+.confirm-row:last-child{border-bottom:none;}
+.confirm-icon{width:30px;height:30px;border-radius:9px;background:rgba(212,160,23,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.confirm-label{font-size:9px;color:var(--text-light);margin-bottom:1px;text-transform:uppercase;letter-spacing:.3px;}
+.confirm-value{font-size:13px;font-weight:500;color:var(--cream);}
+.confirm-price{font-family:'Playfair Display',serif;font-size:17px;color:var(--gold-lt);}
+
+/* Payment */
+.payment-card{margin:0 12px;background:linear-gradient(135deg,rgba(46,125,82,0.15),rgba(46,125,82,0.05));border:1px solid rgba(46,125,82,0.3);border-radius:14px;padding:16px 18px;}
+.payment-title{font-family:'Playfair Display',serif;font-size:16px;color:var(--cream);margin-bottom:4px;}
+.payment-sub{font-size:11px;color:var(--text-light);margin-bottom:14px;}
+.payment-amount{font-family:'Playfair Display',serif;font-size:28px;color:var(--gold-lt);font-weight:700;margin-bottom:4px;}
+.payment-note{font-size:10px;color:var(--text-light);margin-bottom:14px;}
+.btn-pay{width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#2E7D52,#4CAF7D);color:white;font-family:'Poppins';font-size:14px;font-weight:600;cursor:pointer;transition:all .25s;box-shadow:0 4px 16px rgba(46,125,82,0.3);}
+.btn-skip{width:100%;padding:10px;border:1px solid rgba(255,255,255,0.1);border-radius:10px;background:transparent;color:var(--text-light);font-family:'Poppins';font-size:12px;cursor:pointer;margin-top:8px;transition:all .2s;}
+.btn-skip:hover{border-color:rgba(212,160,23,0.3);color:var(--gold);}
+.upi-wrap{margin-top:12px;text-align:center;}
+.upi-link{font-size:12px;color:var(--saffron);text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
+
+/* Policy */
+.policy-tags{display:flex;gap:7px;padding:10px 12px 0;flex-wrap:wrap;}
+.policy-tag{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text-light);background:rgba(255,255,255,0.03);border:1px solid var(--border-lt);border-radius:20px;padding:4px 9px;}
+
+/* Notes */
+.notes-wrap{padding:12px 12px 0;}
+.notes-label{font-size:11px;color:var(--text-light);margin-bottom:5px;}
+.notes-input{width:100%;background:rgba(255,255,255,0.03);border:1px solid var(--border-lt);border-radius:10px;padding:10px 13px;color:var(--cream);font-size:12px;font-family:'Poppins';outline:none;resize:none;min-height:60px;transition:border-color .2s;}
+.notes-input:focus{border-color:var(--gold);}
+.notes-input::placeholder{color:rgba(160,113,74,0.5);}
+
+/* Success */
+.success-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;}
+.success-mandala{font-size:60px;margin-bottom:16px;animation:pulse 2s ease infinite;filter:drop-shadow(0 0 18px rgba(212,160,23,0.5));}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.success-title{font-family:'Playfair Display',serif;font-size:26px;color:var(--gold-lt);margin-bottom:4px;}
+.success-hindi{font-family:'Noto Sans Devanagari',sans-serif;font-size:13px;color:var(--text-light);margin-bottom:18px;opacity:.8;}
+.success-card{background:linear-gradient(145deg,rgba(212,160,23,0.12),rgba(255,107,0,0.05));border:1px solid rgba(212,160,23,0.25);border-radius:18px;padding:18px;width:100%;max-width:340px;margin-bottom:16px;}
+.success-detail{font-size:14px;color:var(--cream);line-height:1.6;margin-bottom:10px;}
+.success-ref{font-family:'Playfair Display',serif;font-size:17px;color:var(--gold);letter-spacing:2px;}
+.success-note{font-size:10px;color:var(--text-light);margin-top:6px;}
+.lotus-div{text-align:center;color:var(--gold);font-size:12px;opacity:.4;letter-spacing:4px;padding:8px 0;}
+
+/* Bottom bar */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;padding:10px 14px 18px;background:linear-gradient(to top,#0F0500 65%,transparent);max-width:430px;margin:0 auto;z-index:100;}
+.btn-primary{width:100%;padding:14px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--gold),var(--saffron));color:var(--ink);font-family:'Poppins';font-size:14px;font-weight:600;cursor:pointer;transition:all .25s;box-shadow:0 4px 18px rgba(212,160,23,0.3);}
+.btn-primary:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;}
+.btn-primary:not(:disabled):active{transform:scale(.98);}
+
+.error-msg{background:rgba(178,34,34,0.15);border:1px solid rgba(178,34,34,0.3);border-radius:8px;padding:8px 12px;font-size:11px;color:#ff8080;margin:8px 12px 0;display:none;}
+.error-msg.visible{display:block;}
+</style>
 </head>
 <body>
-    <div id="app">
-        <div class="screen active" id="screen-svc">
-            <h2 style="color:var(--gold)">Select Services</h2>
-            <div class="grid" id="svc-list"></div>
-            <button class="btn-primary" id="btn-svc" disabled onclick="goTo('screen-staff')">Choose Expert →</button>
-        </div>
+<div id="app">
 
-        <div class="screen" id="screen-staff">
-            <h2 style="color:var(--gold)">Select Expert</h2>
-            <div id="staff-list"></div>
-            <button class="btn-primary" id="btn-staff" disabled onclick="goTo('screen-time')">Pick Date & Time →</button>
-        </div>
+  <!-- LOADING -->
+  <div class="screen active" id="screen-loading">
+    <div class="loading-wrap">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading salon info...</div>
+    </div>
+  </div>
 
-        <div class="screen" id="screen-time">
-            <h2 style="color:var(--gold)">Appointment Time</h2>
-            <input type="date" id="date-picker" onchange="fetchSlots()">
-            <div class="slot-grid" id="slot-list"></div>
-            <button class="btn-primary" id="btn-time" disabled onclick="goTo('screen-details')">Your Details →</button>
+  <!-- SCREEN 1: SERVICE -->
+  <div class="screen" id="screen-service">
+    <div class="top-ornament"><div class="ornament-line"></div><div class="ornament-diamond">✦</div><div class="ornament-line r"></div></div>
+    <div class="header">
+      <div class="salon-hindi" id="h-hindi">श्रृंगार ब्यूटी स्टूडियो</div>
+      <div class="salon-name" id="h-name">Shringar Studio</div>
+      <div class="salon-tagline">Select Your Service</div>
+    </div>
+    <div class="steps">
+      <div class="step-dot active">1</div><div class="step-line"></div>
+      <div class="step-dot">2</div><div class="step-line"></div>
+      <div class="step-dot">3</div><div class="step-line"></div>
+      <div class="step-dot">4</div><div class="step-line"></div>
+      <div class="step-dot">5</div>
+    </div>
+    <div class="section-wrap">
+      <div class="section-label">Choose Services</div>
+      <div class="section-sub">Step 1 of 5 · Tap to select (multiple allowed)</div>
+    </div>
+    <div class="services-grid" id="services-grid">
+      <!-- Populated by JS from API -->
+    </div>
+    <div class="sel-bar" id="sel-bar">
+      <div class="sel-bar-left">
+        <div class="sel-bar-name" id="sel-bar-name">—</div>
+        <div class="sel-bar-meta">
+          <span class="sel-bar-total" id="sel-bar-total">₹0</span>
+          <span class="sel-bar-dur" id="sel-bar-dur">0 min</span>
         </div>
+      </div>
+      <div class="sel-bar-clear" onclick="clearServices()">✕ Clear</div>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn-primary" id="btn-service" disabled onclick="goTo('screen-staff')">Continue — Select Expert →</button>
+    </div>
+  </div>
 
-        <div class="screen" id="screen-details">
-            <h2 style="color:var(--gold)">Final Step</h2>
-            <input type="text" id="user-name" placeholder="Full Name" oninput="valDetails()">
-            <input type="tel" id="user-phone" placeholder="Mobile Number" maxlength="10" oninput="valDetails()">
-            <button class="btn-primary" id="btn-det" disabled onclick="submitBooking()">Confirm Booking</button>
-        </div>
+  <!-- SCREEN 2: STAFF -->
+  <div class="screen" id="screen-staff">
+    <div class="top-ornament"><div class="ornament-line"></div><div class="ornament-diamond">✦</div><div class="ornament-line r"></div></div>
+    <div class="header">
+      <div class="salon-hindi">अपनी विशेषज्ञ चुनें</div>
+      <div class="salon-name" id="h-name-2">Shringar Studio</div>
+      <div class="salon-tagline">Step 2 · Choose Expert</div>
+    </div>
+    <div class="steps">
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot active">2</div><div class="step-line"></div>
+      <div class="step-dot">3</div><div class="step-line"></div>
+      <div class="step-dot">4</div><div class="step-line"></div>
+      <div class="step-dot">5</div>
+    </div>
+    <div class="back-btn" onclick="goTo('screen-service')">← Back</div>
+    <div class="staff-list" id="staff-list">
+      <!-- Populated by JS from API -->
+    </div>
+    <div class="bottom-bar">
+      <button class="btn-primary" id="btn-staff" disabled onclick="goTo('screen-datetime')">Continue — Pick Date & Time →</button>
+    </div>
+  </div>
 
-        <div class="screen" id="screen-done" style="text-align:center; padding-top:100px;">
-            <h1 style="color:var(--gold)">Booked! ✨</h1>
-            <p id="ref-id" style="font-size:1.5rem; letter-spacing:2px;"></p>
-            <p>Confirmation sent to Telegram.</p>
+  <!-- SCREEN 3: DATE & TIME -->
+  <div class="screen" id="screen-datetime">
+    <div class="top-ornament"><div class="ornament-line"></div><div class="ornament-diamond">✦</div><div class="ornament-line r"></div></div>
+    <div class="header">
+      <div class="salon-hindi">तारीख और समय</div>
+      <div class="salon-name">Date & Time</div>
+      <div class="salon-tagline">Step 3 · Pick a Slot</div>
+    </div>
+    <div class="steps">
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot active">3</div><div class="step-line"></div>
+      <div class="step-dot">4</div><div class="step-line"></div>
+      <div class="step-dot">5</div>
+    </div>
+    <div class="back-btn" onclick="goTo('screen-staff')">← Back</div>
+    <div class="cal-wrap">
+      <div class="cal-header">
+        <div class="cal-nav" onclick="changeMonth(-1)">‹</div>
+        <div class="cal-month" id="cal-month"></div>
+        <div class="cal-nav" onclick="changeMonth(1)">›</div>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-day-name">SUN</div><div class="cal-day-name">MON</div><div class="cal-day-name">TUE</div>
+        <div class="cal-day-name">WED</div><div class="cal-day-name">THU</div><div class="cal-day-name">FRI</div><div class="cal-day-name">SAT</div>
+      </div>
+      <div class="cal-grid" id="cal-days"></div>
+    </div>
+    <div class="slots-section" id="slots-section" style="display:none">
+      <div class="slots-title">Available Slots</div>
+      <div class="slots-grid" id="slots-grid"></div>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn-primary" id="btn-datetime" disabled onclick="goTo('screen-details')">Continue — Your Details →</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: CLIENT DETAILS -->
+  <div class="screen" id="screen-details">
+    <div class="top-ornament"><div class="ornament-line"></div><div class="ornament-diamond">✦</div><div class="ornament-line r"></div></div>
+    <div class="header">
+      <div class="salon-hindi">आपकी जानकारी</div>
+      <div class="salon-name">Your Details</div>
+      <div class="salon-tagline">Step 4 · Name & Phone</div>
+    </div>
+    <div class="steps">
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot active">4</div><div class="step-line"></div>
+      <div class="step-dot">5</div>
+    </div>
+    <div class="back-btn" onclick="goTo('screen-datetime')">← Back</div>
+    <div class="form-wrap">
+      <div class="form-group">
+        <label class="form-label">Your Full Name *</label>
+        <input class="form-input" id="input-name" type="text" placeholder="e.g. Priya Sharma" oninput="validateDetails()"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mobile Number *</label>
+        <div class="phone-wrap">
+          <div class="phone-prefix">🇮🇳 +91</div>
+          <input class="form-input" id="input-phone" type="tel" maxlength="10" placeholder="98765 43210" oninput="validateDetails()"/>
         </div>
+        <div class="form-note">10-digit mobile number for booking confirmation & reminders</div>
+      </div>
+    </div>
+    <div class="notes-wrap">
+      <div class="notes-label">Special Instructions (Optional)</div>
+      <textarea class="notes-input" id="input-notes" placeholder="e.g. sensitive scalp, prefer herbal products, reference photo..."></textarea>
+    </div>
+    <div class="error-msg" id="details-error"></div>
+    <div class="bottom-bar">
+      <button class="btn-primary" id="btn-details" disabled onclick="goTo('screen-confirm')">Continue — Review Booking →</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: CONFIRM + PAYMENT -->
+  <div class="screen" id="screen-confirm">
+    <div class="top-ornament"><div class="ornament-line"></div><div class="ornament-diamond">✦</div><div class="ornament-line r"></div></div>
+    <div class="header">
+      <div class="salon-hindi">बुकिंग की समीक्षा</div>
+      <div class="salon-name">Review & Pay</div>
+      <div class="salon-tagline">Step 5 · Confirm your appointment</div>
+    </div>
+    <div class="steps">
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot done">✓</div><div class="step-line"></div>
+      <div class="step-dot active">5</div>
+    </div>
+    <div class="back-btn" onclick="goTo('screen-details')">← Back</div>
+    <div class="confirm-card">
+      <div class="confirm-head">
+        <div class="confirm-salon" id="conf-salon">Shringar Studio</div>
+        <div class="confirm-sub" id="conf-addr">New Delhi</div>
+      </div>
+      <div class="confirm-rows">
+        <div class="confirm-row"><div class="confirm-icon">🪄</div><div><div class="confirm-label">Service(s)</div><div class="confirm-value" id="conf-service"></div></div></div>
+        <div class="confirm-row"><div class="confirm-icon">👩‍🎨</div><div><div class="confirm-label">Expert</div><div class="confirm-value" id="conf-staff"></div></div></div>
+        <div class="confirm-row"><div class="confirm-icon">📅</div><div><div class="confirm-label">Date</div><div class="confirm-value" id="conf-date"></div></div></div>
+        <div class="confirm-row"><div class="confirm-icon">⏰</div><div><div class="confirm-label">Time · Duration</div><div class="confirm-value" id="conf-slot"></div></div></div>
+        <div class="confirm-row"><div class="confirm-icon">👤</div><div><div class="confirm-label">Client</div><div class="confirm-value" id="conf-client"></div></div></div>
+        <div class="confirm-row"><div class="confirm-icon">💰</div><div><div class="confirm-label">Total Amount</div><div class="confirm-value confirm-price" id="conf-total"></div></div></div>
+      </div>
     </div>
 
-    <script>
-        const tg = window.Telegram?.WebApp;
-        const BACKEND = 'pybackend-production-591b.up.railway.app'; 
-        let booking = { svcs: [], staff: null, date: null, time: null };
+    <!-- Payment section -->
+    <div style="padding:12px 12px 0;">
+      <div class="payment-card">
+        <div class="payment-title">💳 Advance Payment</div>
+        <div class="payment-sub">Pay a small advance to confirm your slot</div>
+        <div class="payment-amount" id="pay-amount">₹100</div>
+        <div class="payment-note">Remaining balance paid at salon. Advance is refundable on cancellation.</div>
+        <button class="btn-pay" id="btn-pay" onclick="initiatePayment()">Pay ₹100 Advance →</button>
+        <button class="btn-skip" onclick="confirmWithoutPayment()">Skip — Pay at Salon Instead</button>
+        <div class="upi-wrap">
+          <a class="upi-link" id="upi-link" href="#">📱 Pay via UPI App</a>
+        </div>
+      </div>
+    </div>
 
-        async function init() {
-            const [s1, s2] = await Promise.all([fetch(`${BACKEND}/api/services`), fetch(`${BACKEND}/api/staff`)]);
-            const services = await s1.json();
-            const staff = await s2.json();
+    <div class="policy-tags">
+      <div class="policy-tag"><span>🔔</span> Reminder 1hr before</div>
+      <div class="policy-tag"><span>❌</span> Free cancellation</div>
+      <div class="policy-tag"><span>🌿</span> Hygienic tools</div>
+    </div>
+    <div class="error-msg" id="confirm-error"></div>
+    <div style="height:100px;"></div>
+  </div>
 
-            document.getElementById('svc-list').innerHTML = services.map(s => `
-                <div class="card" onclick="toggleSvc(this, '${s.name}', ${s.price})">
-                    <b>${s.name}</b><br>₹${s.price}
-                </div>`).join('');
+  <!-- SCREEN 6: SUCCESS -->
+  <div class="screen" id="screen-success">
+    <div class="success-wrap">
+      <div class="success-mandala">🌸</div>
+      <div class="success-title">Booking Confirmed!</div>
+      <div class="success-hindi">आपकी बुकिंग हो गई ✨</div>
+      <div class="success-card">
+        <div class="success-detail" id="success-detail"></div>
+        <div class="lotus-div">✦ ❋ ✦</div>
+        <div class="success-ref" id="success-ref"></div>
+        <div class="success-note">Save this ID to cancel or reschedule · /cancel ID</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-light);line-height:1.7;max-width:300px;text-align:center;">
+        Confirmation sent to your Telegram.<br>
+        You'll receive a reminder 1 hour before.<br><br>
+        <strong style="color:var(--gold)">See you soon! 🙏</strong>
+      </div>
+    </div>
+  </div>
 
-            document.getElementById('staff-list').innerHTML = staff.map(s => `
-                <div class="card" onclick="selectStaff(this, '${s.name}')">${s.name}</div>`).join('');
+</div>
+
+<script>
+// ── Telegram WebApp init ─────────────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#0F0500'); tg.setBackgroundColor('#0F0500'); }
+
+// ── Config ───────────────────────────────────────────────────────────
+const BACKEND_URL  = 'http://localhost:8000';  // ← change to your deployed backend URL
+const BOT_TOKEN    = '8721559800:AAGOz2DePO0962YHnfnsLaGjt4vb1lI0dRA';
+const ADMIN_ID     = '6099012885';
+
+// ── State ────────────────────────────────────────────────────────────
+let CONFIG     = {};
+let SERVICES   = [];
+let STAFF_LIST = [];
+let calYear, calMonth;
+
+const booking = {
+  services:   [],  // [{id, name, price, duration}]
+  staff:      null,
+  date:       null,
+  slot:       null,
+  clientName: '',
+  phone:      '',
+  notes:      '',
+  bookingId:  null,
+  orderId:    null,
+  get totalPrice()    { return booking.services.reduce((a,s) => a+(isNaN(s.price)?0:parseInt(s.price)), 0); },
+  get totalDuration() { return booking.services.reduce((a,s) => a+(isNaN(s.duration)?0:parseInt(s.duration)), 0); },
+  get serviceNames()  { return booking.services.map(s => s.name).join(', '); },
+};
+
+// ── Screen navigation ────────────────────────────────────────────────
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+  if (id === 'screen-datetime') { calYear = null; calMonth = null; renderCalendar(); }
+  if (id === 'screen-confirm')  fillConfirm();
+}
+
+// ── Bootstrap: load config + services + staff from backend ───────────
+async function bootstrap() {
+  try {
+    const [cfg, svcs, stf] = await Promise.all([
+      fetch(`${BACKEND_URL}/api/config`).then(r => r.json()),
+      fetch(`${BACKEND_URL}/api/services`).then(r => r.json()),
+      fetch(`${BACKEND_URL}/api/staff`).then(r => r.json()),
+    ]);
+    CONFIG     = cfg;
+    SERVICES   = svcs;
+    STAFF_LIST = stf;
+
+    // Update UI with salon name
+    document.getElementById('h-name').textContent   = cfg.salon_name || 'Shringar Studio';
+    document.getElementById('h-name-2').textContent = cfg.salon_name || 'Shringar Studio';
+    document.getElementById('conf-salon').textContent = cfg.salon_name || 'Shringar Studio';
+    document.getElementById('conf-addr').textContent  = '📍 ' + (cfg.salon_address || 'New Delhi');
+    document.getElementById('pay-amount').textContent = `₹${cfg.advance_amount || 100}`;
+    document.getElementById('btn-pay').textContent    = `Pay ₹${cfg.advance_amount || 100} Advance →`;
+
+    renderServices();
+    renderStaff();
+    goTo('screen-service');
+  } catch(e) {
+    // Fallback: use hardcoded data if backend unreachable
+    console.warn('Backend unreachable, using fallback data:', e);
+    CONFIG     = { salon_name: 'Shringar Studio', advance_amount: 100, razorpay_key: '' };
+    SERVICES   = [
+      { id:1, name:'Haircut',   duration:30, price:200 },
+      { id:2, name:'Beard Trim',duration:20, price:100 },
+      { id:3, name:'Facial',    duration:60, price:500 },
+      { id:4, name:'Hair Spa',  duration:90, price:700 },
+    ];
+    STAFF_LIST = [
+      { id:1, name:'Priya' },
+      { id:2, name:'Rahul' },
+      { id:3, name:'Neha'  },
+    ];
+    renderServices();
+    renderStaff();
+    goTo('screen-service');
+  }
+}
+
+// ── Render services from API ─────────────────────────────────────────
+const ICONS = ['✂️','🧔','✨','💆','💅','🎨','🌿','💇'];
+function renderServices() {
+  const grid = document.getElementById('services-grid');
+  grid.innerHTML = '';
+  SERVICES.forEach((svc, i) => {
+    const dur = svc.duration >= 60
+      ? `${Math.floor(svc.duration/60)}h${svc.duration%60>0?' '+svc.duration%60+'m':''}`
+      : `${svc.duration} min`;
+    const icon = ICONS[i % ICONS.length];
+    grid.innerHTML += `
+      <div class="service-card" id="svc-${svc.id}" data-id="${svc.id}" data-name="${svc.name}" data-price="${svc.price}" data-duration="${svc.duration}" onclick="toggleService(this)">
+        <span class="svc-icon">${icon}</span>
+        <div class="svc-name">${svc.name}</div>
+        <div class="svc-tags"><span class="svc-tag">${dur}</span></div>
+        <div class="svc-price">₹${parseInt(svc.price).toLocaleString('en-IN')}</div>
+        <span class="svc-check">✓</span>
+      </div>`;
+  });
+}
+
+function toggleService(card) {
+  const id   = parseInt(card.dataset.id);
+  const idx  = booking.services.findIndex(s => s.id === id);
+  if (idx > -1) {
+    booking.services.splice(idx, 1);
+    card.classList.remove('selected');
+  } else {
+    booking.services.push({ id, name: card.dataset.name, price: card.dataset.price, duration: card.dataset.duration });
+    card.classList.add('selected');
+  }
+  updateSelBar();
+  document.getElementById('btn-service').disabled = booking.services.length === 0;
+}
+
+function clearServices() {
+  booking.services = [];
+  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+  updateSelBar();
+  document.getElementById('btn-service').disabled = true;
+}
+
+function updateSelBar() {
+  const bar = document.getElementById('sel-bar');
+  if (!booking.services.length) { bar.classList.remove('visible'); return; }
+  bar.classList.add('visible');
+  document.getElementById('sel-bar-name').textContent  = `${booking.services.length} service${booking.services.length>1?'s':''}: ${booking.serviceNames}`;
+  document.getElementById('sel-bar-total').textContent = `₹${booking.totalPrice.toLocaleString('en-IN')}`;
+  document.getElementById('sel-bar-dur').textContent   = `${booking.totalDuration} min`;
+}
+
+// ── Render staff from API ────────────────────────────────────────────
+const AVATAR_COLORS = [
+  'linear-gradient(135deg,#8B1A1A,#D4A017)',
+  'linear-gradient(135deg,#C0395A,#FF6B00)',
+  'linear-gradient(135deg,#1A5C8A,#C0395A)',
+  'linear-gradient(135deg,#2E7D52,#D4A017)',
+];
+function renderStaff() {
+  const list = document.getElementById('staff-list');
+  list.innerHTML = '';
+  STAFF_LIST.forEach((s, i) => {
+    list.innerHTML += `
+      <div class="staff-card" onclick="selectStaff(this,'${s.name}')">
+        <div class="staff-avatar" style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]}">${s.name[0]}</div>
+        <div class="staff-info">
+          <div class="staff-name">${s.name}</div>
+          <div class="staff-role">Beauty Expert</div>
+          <div class="staff-meta"><span class="staff-stars">★★★★★</span><span class="staff-badge badge-top">Verified</span></div>
+        </div>
+        <div class="staff-check">✓</div>
+      </div>`;
+  });
+  // Any Available
+  list.innerHTML += `
+    <div class="staff-card" onclick="selectStaff(this,'Any Available')">
+      <div class="staff-avatar" style="background:rgba(212,160,23,0.15);border:1px solid rgba(212,160,23,0.4);color:var(--gold);font-size:18px;">✦</div>
+      <div class="staff-info">
+        <div class="staff-name">Any Available</div>
+        <div class="staff-role">First Available Expert</div>
+        <div class="staff-meta"><span style="font-size:10px;color:var(--text-light)">We'll assign the best match</span></div>
+      </div>
+      <div class="staff-check">✓</div>
+    </div>`;
+}
+
+function selectStaff(card, name) {
+  document.querySelectorAll('.staff-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  booking.staff = name;
+  document.getElementById('btn-staff').disabled = false;
+}
+
+// ── Calendar ─────────────────────────────────────────────────────────
+function renderCalendar() {
+  const now = new Date();
+  if (!calYear)  calYear  = now.getFullYear();
+  if (!calMonth) calMonth = now.getMonth();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month').textContent = `${months[calMonth]} ${calYear}`;
+  const grid    = document.getElementById('cal-days');
+  grid.innerHTML = '';
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const totalDays = new Date(calYear, calMonth+1, 0).getDate();
+  const todayStr  = now.toDateString();
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div'); el.className = 'cal-day empty'; grid.appendChild(el);
+  }
+  for (let d = 1; d <= totalDays; d++) {
+    const date = new Date(calYear, calMonth, d);
+    const el = document.createElement('div'); el.className = 'cal-day'; el.textContent = d;
+    const isPast = date < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (isPast) { el.classList.add('disabled'); }
+    else {
+      if (date.toDateString() === todayStr) el.classList.add('today');
+      if (booking.date && date.toDateString() === booking.date.toDateString()) el.classList.add('selected');
+      el.onclick = () => selectDate(date, el);
+    }
+    grid.appendChild(el);
+  }
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+async function selectDate(date, el) {
+  document.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
+  el.classList.add('selected');
+  booking.date = date;
+  booking.slot = null;
+  document.getElementById('btn-datetime').disabled = true;
+  await loadSlots(date.toISOString().split('T')[0]);
+}
+
+async function loadSlots(dateStr) {
+  const section = document.getElementById('slots-section');
+  const grid    = document.getElementById('slots-grid');
+  section.style.display = 'block';
+  grid.innerHTML = '<div class="slots-empty">Loading slots...</div>';
+
+  try {
+    const staff = booking.staff !== 'Any Available' ? booking.staff : '';
+    const url   = `${BACKEND_URL}/api/slots?date=${dateStr}&staff=${encodeURIComponent(staff)}`;
+    const data  = await fetch(url).then(r => r.json());
+
+    if (data.closed) {
+      grid.innerHTML = '<div class="slots-empty">Salon is closed on this day</div>';
+      return;
+    }
+
+    const allSlots = data.all || [];
+    const booked   = new Set(data.booked || []);
+
+    grid.innerHTML = '';
+    allSlots.forEach(slot => {
+      const el = document.createElement('div');
+      el.className = 'slot';
+      el.textContent = slot;
+      if (booked.has(slot)) {
+        el.classList.add('booked');
+        el.title = 'Already booked';
+      } else {
+        el.onclick = () => {
+          document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
+          el.classList.add('selected');
+          booking.slot = slot;
+          document.getElementById('btn-datetime').disabled = false;
+        };
+      }
+      grid.appendChild(el);
+    });
+
+    if (allSlots.length === 0) {
+      grid.innerHTML = '<div class="slots-empty">No slots available for this date</div>';
+    }
+  } catch(e) {
+    // Fallback slots if backend unreachable
+    const fallback = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00','18:30','19:00','19:30'];
+    grid.innerHTML = '';
+    fallback.forEach(slot => {
+      const el = document.createElement('div');
+      el.className = 'slot'; el.textContent = slot;
+      el.onclick = () => {
+        document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected'));
+        el.classList.add('selected');
+        booking.slot = slot;
+        document.getElementById('btn-datetime').disabled = false;
+      };
+      grid.appendChild(el);
+    });
+  }
+}
+
+// ── Client details validation ─────────────────────────────────────────
+function validateDetails() {
+  const name  = document.getElementById('input-name').value.trim();
+  const phone = document.getElementById('input-phone').value.trim();
+  const valid = name.length >= 2 && /^[0-9]{10}$/.test(phone);
+  document.getElementById('btn-details').disabled = !valid;
+  if (phone.length === 10 && !/^[0-9]{10}$/.test(phone)) {
+    showError('details-error', 'Please enter a valid 10-digit mobile number');
+  } else {
+    hideError('details-error');
+  }
+}
+
+// ── Fill confirm screen ───────────────────────────────────────────────
+function fillConfirm() {
+  booking.clientName = document.getElementById('input-name').value.trim();
+  booking.phone      = document.getElementById('input-phone').value.trim();
+  booking.notes      = document.getElementById('input-notes').value.trim();
+
+  const niceDate = booking.date ? booking.date.toLocaleDateString('en-IN', {
+    weekday:'long', year:'numeric', month:'long', day:'numeric'
+  }) : '—';
+  const dur   = booking.totalDuration ? ` · ${booking.totalDuration} min total` : '';
+  const price = booking.totalPrice    ? `₹${booking.totalPrice.toLocaleString('en-IN')}` : 'TBD';
+  const adv   = CONFIG.advance_amount || 100;
+
+  document.getElementById('conf-service').innerHTML = booking.services.length > 1
+    ? booking.services.map(s => `<div style="font-size:11px;margin-bottom:1px">• ${s.name}</div>`).join('')
+    : (booking.serviceNames || '—');
+  document.getElementById('conf-staff').textContent  = booking.staff || '—';
+  document.getElementById('conf-date').textContent   = niceDate;
+  document.getElementById('conf-slot').textContent   = (booking.slot || '—') + dur;
+  document.getElementById('conf-client').textContent = `${booking.clientName} · 📞 ${booking.phone}`;
+  document.getElementById('conf-total').textContent  = price;
+
+  // UPI link
+  const upiId = 'salon@upi';
+  document.getElementById('upi-link').href =
+    `upi://pay?pa=${upiId}&pn=Shringar+Studio&am=${adv}&cu=INR&tn=Advance+Booking`;
+}
+
+// ── Book via backend ──────────────────────────────────────────────────
+async function createBooking() {
+  const dateISO = booking.date.toISOString().split('T')[0];
+  const payload = {
+    init_data:   tg?.initData || '',
+    client_name: booking.clientName,
+    phone:       '+91' + booking.phone,
+    service:     booking.serviceNames,
+    staff:       booking.staff,
+    date:        dateISO,
+    slot:        booking.slot,
+    duration:    booking.totalDuration,
+    total_price: booking.totalPrice,
+    notes:       booking.notes,
+  };
+
+  try {
+    const res  = await fetch(`${BACKEND_URL}/api/book`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Booking failed');
+    return data;
+  } catch(e) {
+    // Fallback: direct Telegram notification if backend unreachable
+    console.warn('Backend unreachable, using direct Telegram fallback');
+    return await createBookingFallback(dateISO);
+  }
+}
+
+async function createBookingFallback(dateISO) {
+  // Send directly via Telegram Bot API (no backend needed)
+  const ref  = 'SHR-' + Math.random().toString(36).substring(2,8).toUpperCase();
+  const user = tg?.initDataUnsafe?.user;
+  const userId   = user?.id        || 'Unknown';
+  const userName = user?.first_name || booking.clientName;
+
+  const niceDate = booking.date.toLocaleDateString('en-IN', {
+    weekday:'long', year:'numeric', month:'long', day:'numeric'
+  });
+
+  const adminMsg =
+    `🔔 *New Booking*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `👤 *Client:*  ${booking.clientName}\n` +
+    `📞 *Phone:*   +91${booking.phone}\n\n` +
+    `🪄 *Service:* ${booking.serviceNames}\n` +
+    `👩‍🎨 *Staff:*   ${booking.staff}\n` +
+    `📅 *Date:*    ${niceDate}\n` +
+    `⏰ *Slot:*    ${booking.slot}\n` +
+    `💰 *Total:*   ₹${booking.totalPrice}\n\n` +
+    `🔖 *ID:* \`${ref}\``;
+
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: ADMIN_ID, text: adminMsg, parse_mode: 'Markdown' }),
+  });
+
+  if (userId !== 'Unknown') {
+    const clientMsg =
+      `🌸 *Booking Confirmed — Shringar Studio*\n\n` +
+      `Namaste *${userName}*! 🙏\n\n` +
+      `🪄 ${booking.serviceNames}\n` +
+      `👩‍🎨 ${booking.staff} · ${niceDate} at ${booking.slot}\n` +
+      `💰 ₹${booking.totalPrice}\n\n` +
+      `🔖 \`${ref}\`\n_To cancel: /cancel ${ref}_`;
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: userId, text: clientMsg, parse_mode: 'Markdown' }),
+    });
+  }
+
+  return { booking_id: ref, conflict: false, order_id: null, amount: CONFIG.advance_amount || 100 };
+}
+
+// ── Razorpay payment ──────────────────────────────────────────────────
+async function initiatePayment() {
+  document.getElementById('btn-pay').disabled = true;
+  document.getElementById('btn-pay').textContent = 'Processing...';
+
+  try {
+    const result = await createBooking();
+    booking.bookingId = result.booking_id;
+    booking.orderId   = result.order_id;
+
+    if (result.conflict) {
+      // Booking went through but show conflict note
+      console.log('CONFLICT: slot already booked, proceeding anyway');
+    }
+
+    if (!result.order_id || !CONFIG.razorpay_key) {
+      // No Razorpay — go to success directly
+      showSuccess(result.booking_id, false);
+      return;
+    }
+
+    // Launch Razorpay
+    const options = {
+      key:         CONFIG.razorpay_key,
+      amount:      result.amount * 100,
+      currency:    'INR',
+      order_id:    result.order_id,
+      name:        CONFIG.salon_name || 'Shringar Studio',
+      description: `Advance for ${booking.serviceNames}`,
+      prefill: {
+        name:    booking.clientName,
+        contact: '+91' + booking.phone,
+      },
+      theme: { color: '#D4A017' },
+      handler: async (response) => {
+        // Verify payment
+        await fetch(`${BACKEND_URL}/api/payment/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_id: booking.bookingId,
+            order_id:   result.order_id,
+            payment_id: response.razorpay_payment_id,
+            signature:  response.razorpay_signature,
+          }),
+        });
+        showSuccess(booking.bookingId, true);
+      },
+      modal: {
+        ondismiss: () => {
+          document.getElementById('btn-pay').disabled = false;
+          document.getElementById('btn-pay').textContent = `Pay ₹${result.amount} Advance →`;
         }
+      }
+    };
+    const rzp = new Razorpay(options);
+    rzp.open();
 
-        function goTo(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
+  } catch(e) {
+    showError('confirm-error', 'Something went wrong. Please try again.');
+    document.getElementById('btn-pay').disabled = false;
+    document.getElementById('btn-pay').textContent = `Pay ₹${CONFIG.advance_amount || 100} Advance →`;
+  }
+}
 
-        function toggleSvc(el, name, price) {
-            el.classList.toggle('selected');
-            const idx = booking.svcs.findIndex(x => x.name === name);
-            if(idx > -1) booking.svcs.splice(idx,1); else booking.svcs.push({name, price});
-            document.getElementById('btn-svc').disabled = booking.svcs.length === 0;
-        }
+async function confirmWithoutPayment() {
+  document.querySelector('.btn-skip').disabled = true;
+  document.querySelector('.btn-skip').textContent = 'Confirming...';
+  try {
+    const result = await createBooking();
+    showSuccess(result.booking_id, false);
+  } catch(e) {
+    showError('confirm-error', 'Something went wrong. Please try again.');
+    document.querySelector('.btn-skip').disabled = false;
+    document.querySelector('.btn-skip').textContent = 'Skip — Pay at Salon Instead';
+  }
+}
 
-        function selectStaff(el, name) {
-            document.querySelectorAll('#staff-list .card').forEach(c => c.classList.remove('selected'));
-            el.classList.add('selected');
-            booking.staff = name;
-            document.getElementById('btn-staff').disabled = false;
-        }
+// ── Show success ──────────────────────────────────────────────────────
+function showSuccess(bookingId, paid) {
+  const niceDate = booking.date.toLocaleDateString('en-IN', {
+    weekday:'long', month:'long', day:'numeric'
+  });
+  document.getElementById('success-detail').innerHTML =
+    `<strong>${booking.serviceNames}</strong><br>` +
+    `with ${booking.staff}<br>${niceDate} at ${booking.slot}<br>` +
+    (paid ? `<span style="color:var(--gold)">💳 Advance paid ✅</span>` : `<span style="color:var(--text-light)">Pay balance at salon</span>`);
+  document.getElementById('success-ref').textContent = `🔖 ${bookingId}`;
+  goTo('screen-success');
+}
 
-        async function fetchSlots() {
-            const d = document.getElementById('date-picker').value;
-            booking.date = d;
-            const res = await fetch(`${BACKEND}/api/slots?date=${d}`);
-            const slots = await res.json();
-            document.getElementById('slot-list').innerHTML = slots.map(s => `
-                <div class="slot ${s.booked?'booked':''}" onclick="selectSlot(this, '${s.time}')">${s.time}</div>`).join('');
-        }
+// ── Utilities ─────────────────────────────────────────────────────────
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = msg; el.classList.add('visible'); }
+}
+function hideError(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('visible');
+}
 
-        function selectSlot(el, time) {
-            document.querySelectorAll('.slot').forEach(s => s.classList.remove('picked'));
-            el.classList.add('picked');
-            booking.time = time;
-            document.getElementById('btn-time').disabled = false;
-        }
-
-        function valDetails() {
-            const n = document.getElementById('user-name').value;
-            const p = document.getElementById('user-phone').value;
-            document.getElementById('btn-det').disabled = !(n.length > 2 && p.length === 10);
-        }
-
-        async function submitBooking() {
-            const btn = document.getElementById('btn-det');
-            btn.disabled = true; btn.innerText = "Saving...";
-            const res = await fetch(`${BACKEND}/api/book`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    user_id: tg?.initDataUnsafe?.user?.id || "0",
-                    clientName: document.getElementById('user-name').value,
-                    phone: document.getElementById('user-phone').value,
-                    serviceNames: booking.svcs.map(s => s.name).join(', '),
-                    date: booking.date,
-                    slot: booking.time
-                })
-            });
-            const out = await res.json();
-            if(out.success) {
-                document.getElementById('ref-id').innerText = out.booking_id;
-                goTo('screen-done');
-            }
-        }
-        init();
-    </script>
+// ── Boot ──────────────────────────────────────────────────────────────
+bootstrap();
+</script>
 </body>
 </html>
